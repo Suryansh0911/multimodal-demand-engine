@@ -1,6 +1,6 @@
 dataset:
   tfrecords_pattern: "data/processed/*.tfrecord"
-  batch_size: 4
+  batch_size: 32
   sequence_length: 128
   temporal_window: 30
   tabular_dim: 15
@@ -13,7 +13,7 @@ model:
   tabular_embedding_dim: 64
 
 training:
-  epochs: 1
+  epochs: 20
   batch_size: 4
   learning_rate: 0.0001
   mixed_precision: true

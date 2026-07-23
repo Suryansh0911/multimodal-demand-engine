@@ -23,9 +23,7 @@ def main():
     optimizer = torch.optim.Adam(
         model.parameters(), lr=float(config["training"]["learning_rate"])
     )
-    scaler = GradScaler(
-        enabled=config["training"].get("mixed_precision", True)
-    )
+    scaler = torch.amp.GradScaler('cuda', enabled=config['training'].get('mixed_precision', True))
 
     # Mock/Processed Dataset Setup (Replace with actual loaded features)
     dummy_data = [
@@ -61,9 +59,7 @@ def main():
             optimizer.zero_grad()
 
             # Automatic Mixed Precision (AMP)
-            with autocast(
-                enabled=config["training"].get("mixed_precision", True)
-            ):
+            with torch.amp.autocast('cuda', enabled=config['training'].get('mixed_precision', True)):
                 predictions = model(input_ids, attention_mask, tabular_features)
                 loss = criterion(predictions, targets)
 
