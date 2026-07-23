@@ -3,6 +3,7 @@ import os
 import torch
 import torch.nn as nn
 import yaml
+from transformers import AutoTokenizer
 from tfrecord.torch.dataset import TFRecordDataset
 from src.models.multimodal_fusion import MultimodalDemandEngine
 
@@ -14,6 +15,10 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"🚀 Training on device: {device}")
+
+    # Initialize Tokenizer for 'text' feature
+    tokenizer_name = config["model"].get("text_backbone", "distilbert-base-uncased")
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
     # Build Model
     model = MultimodalDemandEngine(config).to(device)
@@ -41,27 +46,16 @@ def main():
             f"Expected .tfrecord files in {data_dir}, but found none!"
         )
 
-    print(f"✅ Found {len(tfrecord_files)} .tfrecord files! Setting up PyTorch reader...")
+    print(f"✅ Found {len(tfrecord_files)} .tfrecord files! Mapping schema...")
 
-    # Define feature schema for tfrecord library
+    # Schema description corresponding strictly to your dataset keys
     description = {
-        "input_ids": "int",
-        "attention_mask": "int",
+        "text": "byte",
         "tabular_features": "float",
-        "target": "float",
+        "historical_sales": "float",
+        "future_demand": "float",
     }
 
-    # Combine all tfrecord files into dataset
-    # tfrecord supports reading single or multiple files seamlessly
-    def custom_transform(features):
-        return {
-            "input_ids": torch.tensor(features["input_ids"], dtype=torch.long),
-            "attention_mask": torch.tensor(features["attention_mask"], dtype=torch.long),
-            "tabular_features": torch.tensor(features["tabular_features"], dtype=torch.float32),
-            "target": torch.tensor(features["target"], dtype=torch.float32),
-        }
-
-    # Training Loop across all TFRecord files
     epochs = config["training"]["epochs"]
     batch_size = config["training"]["batch_size"]
     model.train()
@@ -76,10 +70,25 @@ def main():
             loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
             for batch in loader:
-                input_ids = batch["input_ids"].to(device)
-                attention_mask = batch["attention_mask"].to(device)
+                # 1. Decode byte strings from TFRecord to text
+                raw_texts = [
+                    t.decode("utf-8", errors="ignore") if isinstance(t, bytes) else str(t)
+                    for t in batch["text"]
+                ]
+
+                # 2. Dynamic Tokenization
+                encoded = tokenizer(
+                    raw_texts,
+                    padding="max_length",
+                    truncation=True,
+                    max_length=128,
+                    return_tensors="pt",
+                )
+
+                input_ids = encoded["input_ids"].to(device)
+                attention_mask = encoded["attention_mask"].to(device)
                 tabular_features = batch["tabular_features"].to(device)
-                targets = batch["target"].to(device)
+                targets = batch["future_demand"].to(device)
 
                 optimizer.zero_grad()
 
