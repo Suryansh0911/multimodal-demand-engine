@@ -24,8 +24,14 @@ def main():
 
     # Use MSE Loss for clear regression signal on log-scaled targets
     criterion = nn.MSELoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4, weight_decay=1e-2)
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer,
+        max_lr=5e-4,
+        steps_per_epoch=total_batches,
+        epochs=epochs,
+        pct_start=0.1
+        )
     scaler = torch.amp.GradScaler("cuda", enabled=train_cfg.get("mixed_precision", True))
 
     tfrecord_pattern = config.get("dataset", {}).get("tfrecords_pattern", "data/processed/*.tfrecord")
@@ -60,6 +66,8 @@ def main():
 
                 tabular_features = batch["tabular_features"].to(device).float()
                 historical_sales = batch["historical_sales"].to(device).float()
+                # Standardize sequence input across time dimension
+                historical_sales = (historical_sales - historical_sales.mean(dim=-1, keepdim=True)) / (historical_sales.std(dim=-1, keepdim=True) + 1e-6)
 
                 # Fix 1: Squeeze to 1D vector [batch_size]
                 raw_targets = batch["future_demand"].to(device).float().reshape(-1)
