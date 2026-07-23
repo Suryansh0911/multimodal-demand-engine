@@ -9,18 +9,24 @@ class TextEncoder(nn.Module):
     def __init__(self, model_name="distilbert-base-uncased", embed_dim=128):
         super().__init__()
 
-        # Fallback to HF Hub model if local directory doesn't exist
+        # Fallback to Hugging Face Hub if local path doesn't exist
         if not os.path.exists(model_name):
-            print(
-                f"⚠️ Local weights directory '{model_name}' not found. Falling back to Hugging Face Hub: 'distilbert-base-uncased'"
-            )
             model_name = "distilbert-base-uncased"
 
         self.transformer = AutoModel.from_pretrained(model_name)
 
-        # Freeze base parameters
+        # Freeze early layers
         for param in self.transformer.parameters():
             param.requires_grad = False
+
+        # Unfreeze top transformer layer for demand signal alignment
+        if hasattr(self.transformer, "transformer") and hasattr(
+            self.transformer.transformer, "layer"
+        ):
+            for param in self.transformer.transformer.layer[
+                -1
+            ].parameters():
+                param.requires_grad = True
 
         hidden_size = self.transformer.config.hidden_size
         self.fc = nn.Sequential(

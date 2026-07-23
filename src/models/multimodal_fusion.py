@@ -1,5 +1,3 @@
-# src/models/multimodal_fusion.py
-
 import torch
 import torch.nn as nn
 from src.models.text_encoder import TextEncoder
@@ -11,14 +9,10 @@ class MultimodalDemandEngine(nn.Module):
         super().__init__()
         model_cfg = config.get("model", {})
 
-        # 1. Text Encoder (DistilBERT)
-        local_hf_path = model_cfg.get(
-            "local_hf_path", "distilbert-base-uncased"
-        )
+        # 1. Text Encoder
+        local_hf_path = model_cfg.get("local_hf_path", "distilbert-base-uncased")
         text_dim = model_cfg.get("text_embedding_dim", 128)
-        self.text_encoder = TextEncoder(
-            model_name=local_hf_path, embed_dim=text_dim
-        )
+        self.text_encoder = TextEncoder(model_name=local_hf_path, embed_dim=text_dim)
 
         # 2. Tabular Encoder
         num_tabular = model_cfg.get("num_tabular_features", 15)
@@ -34,9 +28,7 @@ class MultimodalDemandEngine(nn.Module):
         # 3. Temporal / Historical Sales Encoder (1D CNN)
         temporal_dim = model_cfg.get("temporal_embedding_dim", 128)
         self.temporal_encoder = nn.Sequential(
-            nn.Conv1d(
-                in_channels=1, out_channels=32, kernel_size=3, padding=1
-            ),
+            nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.AdaptiveAvgPool1d(16),
             nn.Flatten(),
@@ -55,28 +47,21 @@ class MultimodalDemandEngine(nn.Module):
             nn.Linear(64, 1),
         )
 
-    def forward(
-        self, self_or_input_ids, attention_mask=None, tabular_features=None, historical_sales=None
-    ):  # Ensure all 4 input tensors are present in signature!
-        # If positional args match standard signature:
-        if attention_mask is None:
-            # Safety fallback for single arg call
-            return self_or_input_ids
-
-        input_ids = self_or_input_ids
-
-        # Embed text
+    def forward(self, input_ids, attention_mask, tabular_features, historical_sales):
+        # 1. Embed text
         text_emb = self.text_encoder(input_ids, attention_mask)
 
-        # Embed tabular
+        # 2. Embed tabular features
         tab_emb = self.tabular_encoder(tabular_features)
 
-        # Embed historical sales sequence: shape (batch_size, 1, sequence_length)
+        # 3. Embed historical sales (shape: [batch_size, 1, sequence_length])
         if historical_sales.dim() == 2:
             historical_sales = historical_sales.unsqueeze(1)
         temp_emb = self.temporal_encoder(historical_sales)
 
-        # Concatenate all 3 modalities
+        # 4. Concatenate and predict
         fused = torch.cat([text_emb, tab_emb, temp_emb], dim=1)
         output = self.regressor(fused)
+
+        # Return 1D output vector matching target shape
         return output.squeeze(-1)
