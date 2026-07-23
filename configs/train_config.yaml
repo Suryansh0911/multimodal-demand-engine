@@ -6,7 +6,7 @@ dataset:
   tabular_dim: 15
 
 model:
-  local_hf_path: "models/local_hf_weights/distilbert-base-uncased"
+  local_hf_path: "distilbert-base-uncased"
   vision_embedding_dim: 128
   text_embedding_dim: 128
   temporal_embedding_dim: 128
