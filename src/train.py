@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn as nn
 import yaml
-from src.data.pipeline import build_tfrecord_dataloader
+from tfrecord.torch.dataset import TFRecordDataset
 from src.models.multimodal_fusion import MultimodalDemandEngine
 
 
@@ -32,71 +32,70 @@ def main():
     )
     criterion = nn.HuberLoss()
 
-    # Build DataLoader from real .tfrecord files in data/processed/
+    # Find .tfrecord files
     data_dir = "data/processed"
-    tfrecord_files = glob.glob(f"{data_dir}/*.tfrecord")
+    tfrecord_files = sorted(glob.glob(f"{data_dir}/*.tfrecord"))
 
     if not tfrecord_files:
         raise FileNotFoundError(
             f"Expected .tfrecord files in {data_dir}, but found none!"
         )
 
-    print(
-        f"✅ Found {len(tfrecord_files)} .tfrecord files! Constructing PyTorch DataLoader..."
-    )
+    print(f"✅ Found {len(tfrecord_files)} .tfrecord files! Setting up PyTorch reader...")
 
-    # Option A: If tfrecord library is installed, use native parser.
-    # Option B: Otherwise, stream via TensorFlow dataset casting to Torch tensors.
-    import tensorflow as tf
+    # Define feature schema for tfrecord library
+    description = {
+        "input_ids": "int",
+        "attention_mask": "int",
+        "tabular_features": "float",
+        "target": "float",
+    }
 
-    # Suppress TF GPU memory allocation so PyTorch owns the GPU
-    tf.config.set_visible_devices([], "GPU")
-
-    def _parse_function(proto):
-        feature_description = {
-            "input_ids": tf.io.FixedLenFeature([128], tf.int64),
-            "attention_mask": tf.io.FixedLenFeature([128], tf.int64),
-            "tabular_features": tf.io.FixedLenFeature([10], tf.float32),
-            "target": tf.io.FixedLenFeature([], tf.float32),
+    # Combine all tfrecord files into dataset
+    # tfrecord supports reading single or multiple files seamlessly
+    def custom_transform(features):
+        return {
+            "input_ids": torch.tensor(features["input_ids"], dtype=torch.long),
+            "attention_mask": torch.tensor(features["attention_mask"], dtype=torch.long),
+            "tabular_features": torch.tensor(features["tabular_features"], dtype=torch.float32),
+            "target": torch.tensor(features["target"], dtype=torch.float32),
         }
-        return tf.io.parse_single_example(proto, feature_description)
 
-    raw_dataset = tf.data.TFRecordDataset(tfrecord_files)
-    parsed_dataset = raw_dataset.map(_parse_function).batch(
-        config["training"]["batch_size"]
-    )
-
-    # Training Loop
+    # Training Loop across all TFRecord files
     epochs = config["training"]["epochs"]
+    batch_size = config["training"]["batch_size"]
     model.train()
 
     print("⚡ Starting Training Loop on Real Dataset...\n")
     for epoch in range(1, epochs + 1):
         running_loss = 0.0
-        step_count = 0
+        total_batches = 0
 
-        for batch in parsed_dataset:
-            # Cast TensorFlow tensors directly to PyTorch tensors on GPU
-            input_ids = torch.tensor(batch["input_ids"].numpy(), dtype=torch.long).to(device)
-            attention_mask = torch.tensor(batch["attention_mask"].numpy(), dtype=torch.long).to(device)
-            tabular_features = torch.tensor(batch["tabular_features"].numpy(), dtype=torch.float32).to(device)
-            targets = torch.tensor(batch["target"].numpy(), dtype=torch.float32).to(device)
+        for tf_file in tfrecord_files:
+            dataset = TFRecordDataset(tf_file, index_path=None, description=description)
+            loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
 
-            optimizer.zero_grad()
+            for batch in loader:
+                input_ids = batch["input_ids"].to(device)
+                attention_mask = batch["attention_mask"].to(device)
+                tabular_features = batch["tabular_features"].to(device)
+                targets = batch["target"].to(device)
 
-            with torch.amp.autocast("cuda", enabled=config["training"].get("mixed_precision", True)):
-                predictions = model(input_ids, attention_mask, tabular_features)
-                loss = criterion(predictions, targets)
+                optimizer.zero_grad()
 
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+                with torch.amp.autocast("cuda", enabled=config["training"].get("mixed_precision", True)):
+                    predictions = model(input_ids, attention_mask, tabular_features)
+                    loss = criterion(predictions, targets)
 
-            running_loss += loss.item()
-            step_count += 1
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+
+                running_loss += loss.item()
+                total_batches += 1
 
         scheduler.step()
-        epoch_loss = running_loss / max(step_count, 1)
+        epoch_loss = running_loss / max(total_batches, 1)
         print(f"Epoch [{epoch}/{epochs}] - Huber Loss: {epoch_loss:.4f} - RMSE: {epoch_loss**0.5:.4f}")
 
     # Save Checkpoint
@@ -104,7 +103,7 @@ def main():
     os.makedirs(save_dir, exist_ok=True)
     checkpoint_path = os.path.join(save_dir, "multimodal_demand_model.pt")
     torch.save(model.state_dict(), checkpoint_path)
-    print(f"\n✅ Model checkpoint successfully saved to {checkpoint_path}")
+    print(f"\n✅ Model checkpoint saved to {checkpoint_path}")
 
 
 if __name__ == "__main__":
