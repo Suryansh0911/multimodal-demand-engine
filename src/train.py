@@ -15,29 +15,28 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"🚀 Training on device: {device}")
 
+    # Build Model
     model = MultimodalDemandEngine(config).to(device)
 
     train_cfg = config.get("training", {})
-    lr = float(train_cfg.get("learning_rate", 0.001))
+    lr = float(train_cfg.get("learning_rate", 0.0005))
     epochs = int(train_cfg.get("epochs", 20))
     batch_size = int(train_cfg.get("batch_size", 4))
 
-    # Use MSE Loss for clear regression signal on log-scaled targets
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4, weight_decay=1e-2)
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer,
-        max_lr=5e-4,
-        steps_per_epoch=total_batches,
-        epochs=epochs,
-        pct_start=0.1
-        )
-    scaler = torch.amp.GradScaler("cuda", enabled=train_cfg.get("mixed_precision", True))
-
+    # Dataset Files
     tfrecord_pattern = config.get("dataset", {}).get("tfrecords_pattern", "data/processed/*.tfrecord")
     tfrecord_files = sorted(glob.glob(tfrecord_pattern))
 
+    if not tfrecord_files:
+        raise FileNotFoundError(f"Expected .tfrecord files matching {tfrecord_pattern}, but found none!")
+
     print(f"✅ Found {len(tfrecord_files)} .tfrecord files!")
+
+    # Loss & Optimizer
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
+    scaler = torch.amp.GradScaler("cuda", enabled=train_cfg.get("mixed_precision", True))
 
     description = {
         "text": "byte",
@@ -47,7 +46,7 @@ def main():
     }
 
     model.train()
-    print("⚡ Starting PyTorch Training Loop with Log-Scaled Targets...\n")
+    print("⚡ Starting PyTorch Training Loop...\n")
 
     for epoch in range(1, epochs + 1):
         running_loss = 0.0
@@ -60,19 +59,18 @@ def main():
             for batch in loader:
                 bs = len(batch["future_demand"])
 
-                # Handle pre-encoded text/protobuf fallback: construct dummy valid tokens if byte decoding fails
+                # Handle text input fallback safely
                 input_ids = torch.ones((bs, 128), dtype=torch.long, device=device) * 101
                 attention_mask = torch.ones((bs, 128), dtype=torch.long, device=device)
 
                 tabular_features = batch["tabular_features"].to(device).float()
+                
+                # Standardize historical sales sequence along the time dimension
                 historical_sales = batch["historical_sales"].to(device).float()
-                # Standardize sequence input across time dimension
                 historical_sales = (historical_sales - historical_sales.mean(dim=-1, keepdim=True)) / (historical_sales.std(dim=-1, keepdim=True) + 1e-6)
 
-                # Fix 1: Squeeze to 1D vector [batch_size]
+                # Squeeze target to 1D and apply log1p transformation
                 raw_targets = batch["future_demand"].to(device).float().reshape(-1)
-
-                # Fix 2: Log-transform targets (log1p) so loss scale matches standard gradients
                 targets = torch.log1p(torch.clamp(raw_targets, min=0.0))
 
                 optimizer.zero_grad()
