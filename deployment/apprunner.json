@@ -1,0 +1,20 @@
+{
+    "ServiceName": "multimodal-demand-engine",
+    "SourceConfiguration": {
+        "AuthenticationConfiguration": {
+            "AccessRoleArn": "arn:aws:iam::950693198832:role/AppRunnerECRAccessRole"
+        },
+        "AutoDeploymentsEnabled": true,
+        "ImageRepository": {
+            "ImageIdentifier": "950693198832.dkr.ecr.us-east-1.amazonaws.com/demand-engine:latest",
+            "ImageConfiguration": {
+                "Port": "8000"
+            },
+            "ImageRepositoryType": "ECR"
+        }
+    },
+    "InstanceConfiguration": {
+        "Cpu": "1 vCPU",
+        "Memory": "2 GB"
+    }
+}

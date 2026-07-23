@@ -1,0 +1,28 @@
+# Virtual Environment
+multi-demand-engine/
+venv/
+.venv/
+__pycache__/
+
+# Heavy Data & Local Weights
+data/processed/
+data/raw/
+data/raw/processed.zip
+models/checkpoints/
+models/local_hf_weights/
+*.tfrecord
+*.h5
+*.keras
+.csv
+
+# Windows / IDE files
+.vscode/
+Thumbs.db
+.env
+
+# Exclude raw & processed image datasets
+data/raw/images/
+data/processed/images/
+*.jpg
+*.png
+*.jpeg

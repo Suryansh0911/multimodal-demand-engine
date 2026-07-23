@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.git/
+.env
+notebooks/
+data/
+models/local_hf_weights/
