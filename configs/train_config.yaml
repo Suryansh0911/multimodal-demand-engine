@@ -11,6 +11,7 @@ model:
   text_embedding_dim: 128
   temporal_embedding_dim: 128
   tabular_embedding_dim: 64
+  num_tabular_features: 15
 
 training:
   epochs: 20
