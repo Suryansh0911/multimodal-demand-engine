@@ -76,6 +76,24 @@ with col1:
 
     st.subheader("2. Tabular Features (15 Metrics)")
     st.caption("Provide values for the 15 tabular features (e.g., price, discount, rating):")
+
+    FEATURE_NAMES = [
+        "Sell Price ($)",
+        "Discount (%)",
+        "On Promotion (0/1)",
+        "Competitor Price ($)",
+        "Inventory Level",
+        "Product Rating",
+        "Category ID",
+        "Department ID",
+        "Store ID",
+        "State ID",
+        "Is Weekend (0/1)",
+        "Event / Holiday (0/1)",
+        "Rolling Mean (7D)",
+        "Rolling Std (7D)",
+        "Clearance Flag (0/1)"
+    ]
     
     default_tabular = [0.12, 0.45, 0.88, 0.02, 0.15, 0.90, 0.33, 0.41, 0.05, 0.11, 0.22, 0.34, 0.55, 0.61, 0.72]
     tabular_inputs = []
@@ -83,7 +101,8 @@ with col1:
     tab_cols = st.columns(3)
     for i in range(15):
         with tab_cols[i % 3]:
-            val = st.number_input(f"Feature {i+1}", value=default_tabular[i], key=f"tab_{i}")
+            feat_label = FEATURE_NAMES[i] if i < len(FEATURE_NAMES) else f"Feature {i+1}"
+            val = st.number_input(feat_label, value=default_tabular[i], key=f"tab_{i}")
             tabular_inputs.append(val)
 
 with col2:
