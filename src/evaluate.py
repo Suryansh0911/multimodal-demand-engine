@@ -12,7 +12,6 @@ def run_inference():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # 2. Reconstruct Model & Load Trained Checkpoint
     model = MultimodalDemandEngine(config)
     checkpoint_path = "models/checkpoints/multimodal_demand_model.pt"
     model.load_state_dict(torch.load(checkpoint_path, map_location=device))
@@ -20,7 +19,6 @@ def run_inference():
     model.eval()
     print("✅ Checkpoint loaded successfully!")
 
-    # 3. Load Test Data Batch
     tfrecord_files = sorted(glob.glob("data/processed/*.tfrecord"))
     description = {
         "text": "byte",
@@ -32,12 +30,10 @@ def run_inference():
     dataset = TFRecordDataset(tfrecord_files[0], index_path=None, description=description)
     loader = torch.utils.data.DataLoader(dataset, batch_size=5)
 
-    # 4. Predict
     with torch.no_grad():
         for batch in loader:
             bs = len(batch["future_demand"])
             
-            # Input Tensors
             input_ids = torch.ones((bs, 128), dtype=torch.long, device=device) * 101
             attention_mask = torch.ones((bs, 128), dtype=torch.long, device=device)
             tabular_features = batch["tabular_features"].to(device).float()
@@ -45,13 +41,10 @@ def run_inference():
             historical_sales = batch["historical_sales"].to(device).float()
             historical_sales = (historical_sales - historical_sales.mean(dim=-1, keepdim=True)) / (historical_sales.std(dim=-1, keepdim=True) + 1e-6)
 
-            # Ground Truth Targets
             actual_raw_demand = batch["future_demand"].numpy().flatten()
 
-            # Raw Model Outputs (Log Scale)
             log_preds = model(input_ids, attention_mask, tabular_features, historical_sales)
             
-            # Convert Log Predictions back to Real Sales Units
             real_demand_preds = torch.expm1(log_preds).cpu().numpy()
 
             print("\n================ EVALUATION SAMPLE ================")

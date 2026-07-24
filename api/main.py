@@ -6,22 +6,14 @@ import numpy as np
 
 app = FastAPI(title="Multimodal Demand Forecasting API", version="1.0.0")
 
-# In production, model is loaded globally at startup
-# model_runner = TFLiteModelRunner()
-
 @app.post("/predict", response_model=PredictionResponse)
 async def predict_demand(request: PredictionRequest):
     start_time = time.time()
-    
-    # 1. Dummy Vision array (would normally load/decode image here)
     vision_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
-    
-    # 2. Format input payloads
     text_input = np.array([request.text_input_ids], dtype=np.int32)
     temporal_input = np.array([request.temporal_history], dtype=np.float32)
     tabular_input = np.array([request.tabular_features], dtype=np.float32)
-    
-    # prediction = model_runner.predict(vision_input, text_input, temporal_input, tabular_input)
+
     prediction = 142.5  # Mock output
     
     latency = (time.time() - start_time) * 1000

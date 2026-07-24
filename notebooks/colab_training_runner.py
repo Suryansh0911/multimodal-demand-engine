@@ -6,7 +6,6 @@ def run_cmd(cmd):
     subprocess.run(cmd, shell=True, check=True)
 
 print("=== 1. Environment Setup ===")
-# Check if running in Colab and Drive is already mounted
 IN_COLAB = False
 try:
     from google.colab import drive
@@ -23,7 +22,6 @@ except Exception:
 print("=== 2. Repository Setup ===")
 repo_url = "https://github.com/Suryansh0911/multimodal-demand-engine.git"
 
-# Prevent path traps by checking if we are already inside the repository folder
 if os.path.basename(os.getcwd()) != "multimodal-demand-engine":
     if not os.path.exists("multimodal-demand-engine"):
         run_cmd(f"git clone {repo_url}")

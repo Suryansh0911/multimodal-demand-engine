@@ -7,7 +7,6 @@ import streamlit as st
 from transformers import AutoTokenizer
 from src.models.multimodal_fusion import MultimodalDemandEngine
 
-# --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="Multimodal Demand Engine",
     page_icon="📈",
@@ -17,7 +16,6 @@ st.set_page_config(
 st.title("📈 Multimodal Demand Engine")
 st.markdown("Forecast future product demand using Product Description, Tabular Features, and Historical Sales Sequences.")
 
-# --- CACHED MODEL LOADING WITH AUTO-DOWNLOAD FALLBACK ---
 @st.cache_resource
 def load_model_and_tokenizer():
     config_path = "configs/train_config.yaml"
@@ -26,10 +24,8 @@ def load_model_and_tokenizer():
 
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # Auto-download model checkpoint if not found locally or on Streamlit Cloud
     if not os.path.exists(checkpoint_path):
         with st.spinner("Downloading model weights from cloud storage..."):
-            # ⬇️ REPLACE THIS WITH YOUR DIRECT HF/DRIVE FILE DOWNLOAD URL
             MODEL_URL = "https://huggingface.co/Ryan911/multimodal-demand-engine/resolve/main/multimodal_demand_model.pt"
             
             try:
@@ -48,13 +44,11 @@ def load_model_and_tokenizer():
 
     device = torch.device("cpu")
 
-    # Load Tokenizer
     hf_path = config.get("model", {}).get("local_hf_path", "distilbert-base-uncased")
     if not os.path.exists(hf_path):
         hf_path = "distilbert-base-uncased"
     tokenizer = AutoTokenizer.from_pretrained(hf_path)
 
-    # Load Model
     model = MultimodalDemandEngine(config)
     model.load_state_dict(torch.load(checkpoint_path, map_location=device))
     model.eval()
@@ -70,7 +64,6 @@ except Exception as e:
 
 st.divider()
 
-# --- INPUT SECTION ---
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -84,7 +77,6 @@ with col1:
     st.subheader("2. Tabular Features (15 Metrics)")
     st.caption("Provide values for the 15 tabular features (e.g., price, discount, rating):")
     
-    # 15 Tabular Input Fields organized into grid
     default_tabular = [0.12, 0.45, 0.88, 0.02, 0.15, 0.90, 0.33, 0.41, 0.05, 0.11, 0.22, 0.34, 0.55, 0.61, 0.72]
     tabular_inputs = []
     
@@ -104,7 +96,6 @@ with col2:
         42.1, 41.0, 45.0, 44.2, 48.0, 46.5, 50.1, 49.0, 52.3, 54.0
     ]
 
-    # Editable Dataframe / Data Editor for 30 historical values
     edited_sales = st.data_editor(
         {"Day": [f"Day {i+1}" for i in range(30)], "Sales Volume": default_sales},
         num_rows="fixed",
@@ -115,11 +106,9 @@ with col2:
 
 st.divider()
 
-# --- PREDICTION TRIGGER ---
 if st.button("🚀 Forecast Demand", type="primary", use_container_width=True):
     with st.spinner("Running PyTorch Multimodal Inference..."):
         try:
-            # 1. Process Text
             encoded = tokenizer(
                 product_description,
                 padding="max_length",
@@ -130,27 +119,22 @@ if st.button("🚀 Forecast Demand", type="primary", use_container_width=True):
             input_ids = encoded["input_ids"]
             attention_mask = encoded["attention_mask"]
 
-            # 2. Process Tabular
             tab_feat = torch.tensor([tabular_inputs], dtype=torch.float32)
 
-            # 3. Process Historical Sales Sequence
             hist_sales = torch.tensor([historical_sales_inputs], dtype=torch.float32)
             hist_sales = (hist_sales - hist_sales.mean(dim=-1, keepdim=True)) / (hist_sales.std(dim=-1, keepdim=True) + 1e-6)
 
-            # 4. Inference Pass
             with torch.no_grad():
                 log_pred = model(input_ids, attention_mask, tab_feat, hist_sales).item()
                 real_demand = max(0.0, float(np.expm1(log_pred)))
 
-            # --- DISPLAY RESULTS ---
-            st.balloons()
+            st.success("✅ Inference completed successfully!")
             st.metric(
                 label="Predicted Future Demand Volume",
                 value=f"{real_demand:.2f} Units",
                 delta=f"{real_demand - historical_sales_inputs[-1]:+.2f} Units relative to last day"
             )
 
-            # Plot Historical Sales vs Forecast
             chart_data = list(historical_sales_inputs) + [real_demand]
             
             st.line_chart({"Sales / Forecast": chart_data}, use_container_width=True)

@@ -58,18 +58,14 @@ def main():
 
             for batch in loader:
                 bs = len(batch["future_demand"])
-
-                # Handle text input fallback safely
                 input_ids = torch.ones((bs, 128), dtype=torch.long, device=device) * 101
                 attention_mask = torch.ones((bs, 128), dtype=torch.long, device=device)
 
                 tabular_features = batch["tabular_features"].to(device).float()
                 
-                # Standardize historical sales sequence along the time dimension
                 historical_sales = batch["historical_sales"].to(device).float()
                 historical_sales = (historical_sales - historical_sales.mean(dim=-1, keepdim=True)) / (historical_sales.std(dim=-1, keepdim=True) + 1e-6)
 
-                # Squeeze target to 1D and apply log1p transformation
                 raw_targets = batch["future_demand"].to(device).float().reshape(-1)
                 targets = torch.log1p(torch.clamp(raw_targets, min=0.0))
 

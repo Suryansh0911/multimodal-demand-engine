@@ -4,7 +4,6 @@ import tensorflow as tf
 def export_quantized_model(keras_model_path, output_tflite_path):
     print(f"Loading full precision model from {keras_model_path}...")
     
-    # Load the trained .keras artifact
     if not os.path.exists(keras_model_path):
         raise FileNotFoundError(f"Cannot find trained model at {keras_model_path}. Run training first.")
         
@@ -12,11 +11,8 @@ def export_quantized_model(keras_model_path, output_tflite_path):
     
     print("Configuring TFLite Converter...")
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
-    
-    # Apply dynamic range quantization (8-bit weights, float32 activations)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     
-    # Ensure ops fall back to standard TF if not supported in TFLite
     converter.target_spec.supported_ops = [
         tf.lite.OpsSet.TFLITE_BUILTINS,
         tf.lite.OpsSet.SELECT_TF_OPS
@@ -24,14 +20,11 @@ def export_quantized_model(keras_model_path, output_tflite_path):
     
     print("Converting model. This may take a few minutes...")
     quantized_tflite_model = converter.convert()
-    
-    # Ensure output directory exists
     os.makedirs(os.path.dirname(output_tflite_path), exist_ok=True)
     
     with open(output_tflite_path, "wb") as f:
         f.write(quantized_tflite_model)
         
-    # Calculate compression metrics
     original_size_mb = os.path.getsize(keras_model_path) / (1024 * 1024)
     quantized_size_mb = os.path.getsize(output_tflite_path) / (1024 * 1024)
     
@@ -41,11 +34,8 @@ def export_quantized_model(keras_model_path, output_tflite_path):
     print(f"Model saved to: {output_tflite_path}")
 
 if __name__ == "__main__":
-    # Define paths according to the enterprise folder layout
     INPUT_KERAS_MODEL = "models/checkpoints/demand_engine_best.keras"
     OUTPUT_TFLITE_MODEL = "models/demand_engine_quant.tflite"
-    
-    # Create a dummy model if the actual checkpoint doesn't exist yet (for structural testing)
     if not os.path.exists(INPUT_KERAS_MODEL):
         print("Creating dummy checkpoint for testing the exporter...")
         os.makedirs("models/checkpoints/", exist_ok=True)

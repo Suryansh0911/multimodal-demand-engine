@@ -10,11 +10,4 @@ class TFLiteModelRunner:
         self.output_details = self.interpreter.get_output_details()
         
     def predict(self, vision, text, temporal, tabular):
-        # 1. Map inputs to corresponding indices
-        # 2. Invoke interpreter
-        # self.interpreter.set_tensor(self.input_details[0]['index'], vision)
-        # ...
-        # self.interpreter.invoke()
-        
-        # Mock prediction for endpoint testing
         return float(np.random.normal(150.0, 15.0))

@@ -6,16 +6,13 @@ ENV PORT=8080
 
 WORKDIR /app
 
-# Install system build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements from root and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all project code & pretrained weights into container
 COPY . .
 
 EXPOSE 8080

@@ -4,7 +4,6 @@ from torch.utils.data import DataLoader, IterableDataset
 try:
     from tfrecord.torch.dataset import TFRecordDataset
 except ImportError:
-    # Fallback to pure PyTorch loader if tfrecord library is absent
     pass
 
 
@@ -46,7 +45,6 @@ def build_tfrecord_dataloader(tfrecord_dir, batch_size=32):
 
     print(f"📦 Loading {len(tfrecord_files)} TFRecord files from {tfrecord_dir}")
 
-    # Standard TFRecord schema description for tfrecord library
     description = {
         "input_ids": "int",
         "attention_mask": "int",
@@ -54,7 +52,6 @@ def build_tfrecord_dataloader(tfrecord_dir, batch_size=32):
         "target": "float",
     }
 
-    # Stream TFRecords natively into PyTorch
     dataset = TFRecordDataset(
         tfrecord_files[0], index_path=None, description=description
     )

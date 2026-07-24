@@ -35,8 +35,6 @@ def generate_tfrecords():
     print("Loading local HuggingFace tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
     
-    # 2. Mock Data Merging (Replace with actual Pandas merges of M5 and ABO data)
-    # In reality, you will merge M5's sales_train_evaluation.csv with ABO's listings.json
     print("Fusing M5 Time-Series with ABO Metadata...")
     total_samples = 1000 # Dummy count for execution
     
@@ -48,35 +46,25 @@ def generate_tfrecords():
         with tf.io.TFRecordWriter(shard_path) as writer:
             for i in range(samples_per_shard):
                 
-                # --- A. Vision Modality ---
-                # Fallback to a blank image if product image is missing
                 dummy_image = tf.io.encode_jpeg(tf.zeros([224, 224, 3], dtype=tf.uint8)).numpy()
                 
-                # --- B. Text Modality ---
                 product_title = "Example product title description for text encoder"
                 tokens = tokenizer(
                     product_title, 
                     max_length=128, 
                     padding='max_length', 
                     truncation=True, 
-                    return_tensors="np" # Changed 'tf' to 'np' (NumPy)
+                    return_tensors="np"
                 )
-                # Explicitly convert the NumPy array to a TensorFlow integer tensor
                 input_tensor = tf.convert_to_tensor(tokens['input_ids'][0], dtype=tf.int32)
                 text_input_ids = tf.io.serialize_tensor(input_tensor).numpy()
                 
-                # --- C. Temporal Modality ---
                 historical_sales = np.random.uniform(0, 50, size=(30,)).astype(np.float32).tolist()
                 
-                # --- D. Tabular Modality ---
-                # Fusing pricing vectors with unsupervised customer segmentation clusters 
-                # (e.g., K-Means/DBSCAN cluster IDs) provides strong behavioral signals.
                 tabular_features = np.random.uniform(0, 1, size=(15,)).astype(np.float32).tolist()
                 
-                # --- E. Target Label ---
-                future_demand = [np.random.uniform(10, 100)] # Day 31 demand
+                future_demand = [np.random.uniform(10, 100)]
 
-                # Construct TFRecord Feature Dictionary
                 feature = {
                     'image': _bytes_feature(dummy_image),
                     'text': _bytes_feature(text_input_ids),

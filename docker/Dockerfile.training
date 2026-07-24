@@ -1,33 +1,26 @@
 # Base image with TensorFlow GPU 2.15.0 support
 FROM tensorflow/tensorflow:2.15.0-gpu
 
-# Prevent Python from writing .pyc files and enable unbuffered logging for real-time training progress
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# CRITICAL: Enforce Keras 2 legacy mode for Hugging Face Transformers compatibility
 ENV TF_USE_LEGACY_KERAS=1
 
-# Disable redundant oneDNN logs inside container logs
 ENV TF_ENABLE_ONEDNN_OPTS=0
 
 WORKDIR /app
 
-# Install system dependencies for image decoding / pre-processing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy source code, configs, and local model weights
 COPY src/ /app/src/
 COPY configs/ /app/configs/
 COPY models/local_hf_weights/ /app/models/local_hf_weights/
 
-# Start training run
 CMD ["python", "-m", "src.train"]
