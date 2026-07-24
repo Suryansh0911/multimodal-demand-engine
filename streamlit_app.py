@@ -1,4 +1,5 @@
 import os
+import urllib.request
 import yaml
 import torch
 import numpy as np
@@ -16,11 +17,27 @@ st.set_page_config(
 st.title("📈 Multimodal Demand Engine")
 st.markdown("Forecast future product demand using Product Description, Tabular Features, and Historical Sales Sequences.")
 
-# --- CACHED MODEL LOADING ---
+# --- CACHED MODEL LOADING WITH AUTO-DOWNLOAD FALLBACK ---
 @st.cache_resource
 def load_model_and_tokenizer():
     config_path = "configs/train_config.yaml"
-    checkpoint_path = "models/checkpoints/multimodal_demand_model.pt"
+    checkpoint_dir = "models/checkpoints"
+    checkpoint_path = os.path.join(checkpoint_dir, "multimodal_demand_model.pt")
+
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    # Auto-download model checkpoint if not found locally or on Streamlit Cloud
+    if not os.path.exists(checkpoint_path):
+        with st.spinner("Downloading model weights from cloud storage..."):
+            # ⬇️ REPLACE THIS WITH YOUR DIRECT HF/DRIVE FILE DOWNLOAD URL
+            MODEL_URL = "https://huggingface.co/Ryan911/multimodal-demand-engine/resolve/main/multimodal_demand_model.pt"
+            
+            try:
+                urllib.request.urlretrieve(MODEL_URL, checkpoint_path)
+                st.toast("✅ Model checkpoint downloaded successfully!")
+            except Exception as download_err:
+                st.error(f"Failed to download model weights: {download_err}")
+                st.stop()
 
     if not os.path.exists(config_path):
         st.error(f"Config missing at {config_path}")
@@ -135,7 +152,6 @@ if st.button("🚀 Forecast Demand", type="primary", use_container_width=True):
 
             # Plot Historical Sales vs Forecast
             chart_data = list(historical_sales_inputs) + [real_demand]
-            chart_labels = [f"Day {i+1}" for i in range(30)] + ["Forecast Target"]
             
             st.line_chart({"Sales / Forecast": chart_data}, use_container_width=True)
 
