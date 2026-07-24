@@ -5,3 +5,11 @@ __pycache__/
 notebooks/
 data/
 models/local_hf_weights/
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
