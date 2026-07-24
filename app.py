@@ -39,7 +39,7 @@ def load_artifacts():
         # ⬇️ REPLACE THIS WITH YOUR DIRECT HF / CLOUD DOWNLOAD URL
         model_url = os.getenv(
             "MODEL_URL",
-            "https://huggingface.co/YOUR_USERNAME/multimodal-demand-model/resolve/main/multimodal_demand_model.pt"
+            "https://huggingface.co/Ryan911/multimodal-demand-engine/resolve/main/multimodal_demand_model.pt"
         )
         
         try:
