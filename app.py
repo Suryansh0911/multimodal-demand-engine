@@ -1,4 +1,5 @@
 import os
+import urllib.request
 import yaml
 import torch
 import numpy as np
@@ -27,21 +28,40 @@ def load_artifacts():
     global MODEL, TOKENIZER, CONFIG
 
     config_path = "configs/train_config.yaml"
-    checkpoint_path = "models/checkpoints/multimodal_demand_model.pt"
+    checkpoint_dir = "models/checkpoints"
+    checkpoint_path = os.path.join(checkpoint_dir, "multimodal_demand_model.pt")
+
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    # Auto-download model checkpoint if missing locally or on cloud server
+    if not os.path.exists(checkpoint_path):
+        print("⏳ Model checkpoint missing. Auto-downloading from Hugging Face...")
+        # ⬇️ REPLACE THIS WITH YOUR DIRECT HF / CLOUD DOWNLOAD URL
+        model_url = os.getenv(
+            "MODEL_URL",
+            "https://huggingface.co/YOUR_USERNAME/multimodal-demand-model/resolve/main/multimodal_demand_model.pt"
+        )
+        
+        try:
+            urllib.request.urlretrieve(model_url, checkpoint_path)
+            print("✅ Checkpoint successfully downloaded!")
+        except Exception as err:
+            raise RuntimeError(f"Failed to auto-download model checkpoint from {model_url}: {err}")
 
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Config file missing at {config_path}")
-    if not os.path.exists(checkpoint_path):
-        raise FileNotFoundError(f"Model checkpoint missing at {checkpoint_path}")
 
+    # Load Config
     with open(config_path, "r") as f:
         CONFIG = yaml.safe_load(f)
 
+    # Initialize Tokenizer
     hf_path = CONFIG.get("model", {}).get("local_hf_path", "distilbert-base-uncased")
     if not os.path.exists(hf_path):
         hf_path = "distilbert-base-uncased"
     TOKENIZER = AutoTokenizer.from_pretrained(hf_path)
 
+    # Initialize Model Architecture & Load Saved State
     MODEL = MultimodalDemandEngine(CONFIG)
     MODEL.load_state_dict(torch.load(checkpoint_path, map_location=DEVICE))
     MODEL.to(DEVICE)
@@ -71,6 +91,8 @@ class InferenceResponse(BaseModel):
     predicted_demand_units: float
     log_demand_scale: float
 
+
+# 4. API Endpoints
 @app.get("/")
 def health_check():
     return {
